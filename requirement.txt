@@ -1,0 +1,6 @@
+ultralytics
+opencv-python
+imutils
+pandas
+numpy
+gradio

@@ -1,0 +1,8 @@
+{
+  "name": "omr-fullstack",
+  "version": "1.0.0",
+  "scripts": {
+    "start": "concurrently \"npm --prefix omr-backend start\" \"npm --prefix omr-frontend run dev\""
+  }
+
+}
