@@ -33,15 +33,23 @@ def process_answers(image_draw, answer_blocks, correct_answers, filename, resize
 
             if correct_answers and question_number <= len(correct_answers):
                 true_answer = correct_answers[question_number - 1]
-                if filled and predicted_answer == true_answer and predicted_answer in coord_dict:
-                    x, y = coord_dict[predicted_answer]
-                    contour = [c for x_, y_, c in row_coords if (x_, y_) == (x, y)][0]
-                    radius = get_bounding_circle_radius(contour)
-                    abs_x, abs_y, radius = convert_to_original_scale(x + crop_w, y, radius, x1, y1, resize_scale)
-                    cv2.circle(block_cropped, (x, y), max(1, radius), (0, 255, 0), 2)
-                    cv2.circle(image_draw, (abs_x, abs_y), max(1, radius), (0, 255, 0), 2)
 
-                if predicted_answer == true_answer:
-                    correct += 1
+                # Nếu có đáp án đúng nằm trong A-D
+                if true_answer in coord_dict:
+                    x, y = coord_dict[true_answer]
+                    contour = [c for x_, y_, c in row_coords if (x_, y_) == (x, y)]
+                    if contour:
+                        radius = get_bounding_circle_radius(contour[0])
+                        abs_x, abs_y, radius = convert_to_original_scale(x + crop_w, y, radius, x1, y1, resize_scale)
+
+                        if predicted_answer == true_answer:
+                            # Tô xanh nếu đúng
+                            cv2.circle(block_cropped, (x, y), max(1, radius), (0, 255, 0), 2)
+                            cv2.circle(image_draw, (abs_x, abs_y), max(1, radius), (0, 255, 0), 2)
+                            correct += 1
+                        else:
+                            # Tô đỏ nếu đáp án đúng bị bỏ trống
+                            cv2.circle(block_cropped, (x, y), max(1, radius), (0, 0, 255), 2)
+                            cv2.circle(image_draw, (abs_x, abs_y), max(1, radius), (0, 0, 255), 2)
 
     return all_answers, correct, len(all_answers)

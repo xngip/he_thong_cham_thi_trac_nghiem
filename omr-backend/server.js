@@ -16,6 +16,23 @@ app.use(express.json());
 app.use('/uploads', express.static('uploads'));
 app.use('/output', express.static('output'));
 
+// Xoá file trong các thư mục mỗi lần server khởi động
+const cleanDirectories = () => {
+  const dirsToClean = ['uploads', 'result', 'output', 'images_test'];
+  dirsToClean.forEach(dir => {
+    if (fs.existsSync(dir)) {
+      fs.readdirSync(dir).forEach(file => {
+        const filePath = path.join(dir, file);
+        try {
+          fs.unlinkSync(filePath);
+        } catch (err) {
+          console.warn(`Không thể xoá ${filePath}:`, err.message);
+        }
+      });
+    }
+  });
+};
+
 // Tạo thư mục cần thiết
 const createDirectories = () => {
   const dirs = ['uploads', 'output', 'images_test', 'grade', 'result', 'temp'];
@@ -26,6 +43,7 @@ const createDirectories = () => {
   });
 };
 
+cleanDirectories();
 createDirectories();
 
 // Cấu hình Multer để upload file
@@ -380,21 +398,29 @@ app.delete('/api/images/:id', (req, res) => {
 // 8. Clear tất cả dữ liệu
 app.post('/api/clear-all', (req, res) => {
   try {
-    // Xóa tất cả ảnh đã upload
-    uploadedImages.forEach(img => {
-      [img.path, img.path.replace('uploads/', 'uploads/thumb_')].forEach(filePath => {
-        if (fs.existsSync(filePath)) {
-          fs.unlinkSync(filePath);
-        }
-      });
+    const dirsToClean = ['uploads', 'result', 'output', 'images_test'];
+    dirsToClean.forEach(dir => {
+      const fullPath = path.join(__dirname, dir);
+      if (fs.existsSync(fullPath)) {
+        fs.readdirSync(fullPath).forEach(file => {
+          const filePath = path.join(fullPath, file);
+          if (fs.lstatSync(filePath).isFile()) {
+            try {
+              fs.unlinkSync(filePath); // Xóa file
+            } catch (err) {
+              console.warn(`❌ Không thể xóa ${filePath}: ${err.message}`);
+            }
+          }
+        });
+      }
     });
 
     uploadedImages = [];
     answerKeys = {};
 
-    res.json({ success: true, message: 'Đã xóa tất cả dữ liệu' });
+    res.json({ success: true, message: '✅ Đã xoá toàn bộ file trong các thư mục tạm' });
   } catch (error) {
-    console.error('Error clearing data:', error);
+    console.error('❌ Lỗi khi xóa dữ liệu:', error.message);
     res.status(500).json({ error: 'Lỗi khi xóa dữ liệu: ' + error.message });
   }
 });

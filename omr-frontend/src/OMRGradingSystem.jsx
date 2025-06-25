@@ -1,4 +1,4 @@
-import React, { useState, useRef } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import {
   Upload, FileText, Image, Download, CheckCircle, XCircle,
   Calculator, FileSpreadsheet
@@ -13,9 +13,23 @@ const OMRGradingSystem = () => {
   const [gradingResults, setGradingResults] = useState([]);
   const [isProcessing, setIsProcessing] = useState(false);
   const [selectedExamCode, setSelectedExamCode] = useState('');
+  const [modalImagePair, setModalImagePair] = useState(null);
 
   const imageInputRef = useRef(null);
   const excelInputRef = useRef(null);
+
+  useEffect(() => {
+    const clearAll = async () => {
+      try {
+        const res = await fetch(`${API_BASE}/api/clear-all`, { method: 'POST' });
+        const data = await res.json();
+        console.log('✅ Dọn dữ liệu:', data.message);
+      } catch (err) {
+        console.error('❌ Lỗi khi gọi clear-all:', err);
+      }
+    };
+    clearAll();
+  }, []);
 
   const handleImageUpload = async (event) => {
     const files = event.target.files;
@@ -122,23 +136,6 @@ const OMRGradingSystem = () => {
     } catch (err) {
       console.error(err);
       alert('Lỗi kết nối server khi xuất file');
-    }
-  };
-
-  const removeImage = async (imageId) => {
-    try {
-      const res = await fetch(`${API_BASE}/api/images/${imageId}`, {
-        method: 'DELETE',
-      });
-      const data = await res.json();
-      if (data.success) {
-        setUploadedImages(prev => prev.filter(img => img.id !== imageId));
-      } else {
-        alert(data.error || 'Lỗi xóa ảnh');
-      }
-    } catch (err) {
-      console.error(err);
-      alert('Lỗi kết nối server khi xóa ảnh');
     }
   };
 
@@ -336,131 +333,79 @@ const OMRGradingSystem = () => {
         {/* Results Tab */}
         {activeTab === 'results' && (
           <div className="max-w-7xl mx-auto">
-            {gradingResults.length === 0 ? (
-              <div className="bg-white rounded-xl shadow-lg p-8 text-center">
-                <FileText className="mx-auto text-gray-400 mb-4" size={64} />
-                <h2 className="text-2xl font-bold text-gray-800 mb-4">Chưa có kết quả</h2>
-                <p className="text-gray-600">Vui lòng tải ảnh và thực hiện chấm điểm trước</p>
+            <div className="bg-white rounded-xl shadow-lg overflow-hidden">
+              <div className="overflow-x-auto">
+                <table className="w-full">
+                  <thead className="bg-gray-50">
+                    <tr>
+                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Mã SV</th>
+                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Mã đề</th>
+                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Kết quả</th>
+                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Điểm</th>
+                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Chi tiết</th>
+                    </tr>
+                  </thead>
+                  <tbody className="bg-white divide-y divide-gray-200">
+                    {gradingResults.map((result, index) => (
+                      <tr key={index} className="hover:bg-gray-50">
+                        <td className="px-6 py-4 text-sm font-medium text-gray-900">{result.studentId}</td>
+                        <td className="px-6 py-4 text-sm text-gray-500">{result.examId}</td>
+                        <td className="px-6 py-4 text-sm text-gray-500">
+                          <div className="flex items-center">
+                            {result.score >= 5 ? (
+                              <CheckCircle className="text-green-500 mr-2" size={16} />
+                            ) : (
+                              <XCircle className="text-red-500 mr-2" size={16} />
+                            )}
+                            {result.correctAnswers}/{result.totalQuestions}
+                          </div>
+                        </td>
+                        <td className="px-6 py-4">
+                          <span className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${
+                            result.score >= 8 ? 'bg-green-100 text-green-800' :
+                            result.score >= 5 ? 'bg-yellow-100 text-yellow-800' :
+                            'bg-red-100 text-red-800'
+                          }`}>
+                            {result.score}
+                          </span>
+                        </td>
+                        <td className="px-6 py-4">
+                          <button
+                            onClick={() => setModalImagePair({
+                              original: result.originalImage.startsWith('http') ? result.originalImage : `${API_BASE}${result.originalImage}`,
+                              processed: result.processedImage.startsWith('http') ? result.processedImage : `${API_BASE}${result.processedImage}`
+                            })}
+                            className="text-blue-600 hover:underline font-medium"
+                          >
+                            Xem
+                          </button>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
               </div>
-            ) : (
-              <div className="space-y-6">
-                {/* Summary */}
-                <div className="bg-white rounded-xl shadow-lg p-6">
-                  <div className="flex justify-between items-center">
-                    <h2 className="text-2xl font-bold text-gray-800">Tổng quan kết quả</h2>
-                    <button
-                      onClick={exportResults}
-                      className="bg-green-500 hover:bg-green-600 text-white font-bold py-2 px-4 rounded-lg flex items-center"
-                    >
-                      <Download className="mr-2" size={20} />
-                      Xuất Excel
-                    </button>
-                  </div>
-                  
-                  <div className="grid md:grid-cols-4 gap-4 mt-6">
-                    <div className="bg-blue-50 p-4 rounded-lg text-center">
-                      <h3 className="text-3xl font-bold text-blue-600">{gradingResults.length}</h3>
-                      <p className="text-blue-800">Tổng bài thi</p>
-                    </div>
-                    <div className="bg-green-50 p-4 rounded-lg text-center">
-                      <h3 className="text-3xl font-bold text-green-600">
-                        {Math.round(gradingResults.reduce((sum, r) => sum + r.score, 0) / gradingResults.length * 100) / 100}
-                      </h3>
-                      <p className="text-green-800">Điểm trung bình</p>
-                    </div>
-                    <div className="bg-yellow-50 p-4 rounded-lg text-center">
-                      <h3 className="text-3xl font-bold text-yellow-600">
-                        {Math.max(...gradingResults.map(r => r.score))}
-                      </h3>
-                      <p className="text-yellow-800">Điểm cao nhất</p>
-                    </div>
-                    <div className="bg-red-50 p-4 rounded-lg text-center">
-                      <h3 className="text-3xl font-bold text-red-600">
-                        {Math.min(...gradingResults.map(r => r.score))}
-                      </h3>
-                      <p className="text-red-800">Điểm thấp nhất</p>
-                    </div>
-                  </div>
-                </div>
+            </div>
+          </div>
+        )}
 
-                {/* Results List */}
-                <div className="bg-white rounded-xl shadow-lg overflow-hidden">
-                  <div className="overflow-x-auto">
-                    <table className="w-full">
-                      <thead className="bg-gray-50">
-                        <tr>
-                          <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                            Mã SV
-                          </th>
-                          <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                            Mã đề
-                          </th>
-                          <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                            Kết quả
-                          </th>
-                          <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                            Điểm
-                          </th>
-                          <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                            Ảnh gốc
-                          </th>
-                          <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                            Ảnh đã chấm
-                          </th>
-                        </tr>
-                      </thead>
-                      <tbody className="bg-white divide-y divide-gray-200">
-                        {gradingResults.map((result, index) => (
-                          <tr key={index} className="hover:bg-gray-50">
-                            <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
-                              {result.studentId}
-                            </td>
-                            <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                              {result.examId}
-                            </td>
-                            <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                              <div className="flex items-center">
-                                {result.score >= 5 ? (
-                                  <CheckCircle className="text-green-500 mr-2" size={16} />
-                                ) : (
-                                  <XCircle className="text-red-500 mr-2" size={16} />
-                                )}
-                                {result.correctAnswers}/{result.totalQuestions}
-                              </div>
-                            </td>
-                            <td className="px-6 py-4 whitespace-nowrap">
-                              <span className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${
-                                result.score >= 8 ? 'bg-green-100 text-green-800' :
-                                result.score >= 5 ? 'bg-yellow-100 text-yellow-800' :
-                                'bg-red-100 text-red-800'
-                              }`}>
-                                {result.score}
-                              </span>
-                            </td>
-                            <td className="px-6 py-4 whitespace-nowrap">
-                              <img
-                                src={result.originalImage}
-                                alt="Ảnh gốc"
-                                className="w-12 h-12 object-cover rounded cursor-pointer"
-                                onClick={() => window.open(result.originalImage, '_blank')}
-                              />
-                            </td>
-                            <td className="px-6 py-4 whitespace-nowrap">
-                              <img
-                                src={result.processedImage}
-                                alt="Ảnh đã chấm"
-                                className="w-12 h-12 object-cover rounded cursor-pointer"
-                                onClick={() => window.open(result.processedImage, '_blank')}
-                              />
-                            </td>
-                          </tr>
-                        ))}
-                      </tbody>
-                    </table>
-                  </div>
-                </div>
+        {/* Modal hiển thị ảnh */}
+        {modalImagePair && (
+          <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+            <div className="bg-white w-[80%] max-w-4xl p-6 rounded-xl shadow-xl relative flex">
+              <button
+                onClick={() => setModalImagePair(null)}
+                className="absolute top-3 right-3 text-gray-500 hover:text-gray-700 text-xl font-bold"
+              >×</button>
+              <div className="w-1/2 pr-2">
+                <h3 className="font-semibold text-center mb-2">Bài Làm Của Thí Sinh</h3>
+                <img src={modalImagePair.original} alt="Bài Làm Của Thí Sinh" className="w-full rounded border" />
               </div>
-            )}
+              <div className="w-1/2 pl-2">
+                <h3 className="font-semibold text-center mb-2">Kết Quả Bài Làm Của Thí Sinh</h3>
+                <img src={modalImagePair.processed} alt="Kết Quả Bài Làm Của Thí Sinh" className="w-full rounded border" />
+              </div>
+            </div>
           </div>
         )}
       </div>
