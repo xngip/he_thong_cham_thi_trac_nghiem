@@ -1,22 +1,3 @@
-def get_digit_from_bubbles(coords, rows, cols, height=1000, width=1000):
-    grid = [[[] for _ in range(cols)] for _ in range(rows)]
-    for (x, y) in coords:
-        row = int(y * rows / height)
-        col = int(x * cols / width)
-        if 0 <= row < rows and 0 <= col < cols:
-            grid[row][col].append((x, y))
-    digits = []
-    for col in range(cols):
-        found = False
-        for row in range(rows):
-            if grid[row][col]:
-                digits.append(str(row))
-                found = True
-                break
-        if not found:
-            digits.append('?')
-    return ''.join(digits)
-
 import cv2
 
 def get_bounding_circle_radius(contour):
