@@ -20,10 +20,10 @@ def main():
         img_path = os.path.join(input_dir, filename)
         image = cv2.imread(img_path)
         if image is None:
-            print(f"❌ Không thể đọc ảnh: {img_path}")
+            print(f"Không thể đọc ảnh: {img_path}")
             continue
 
-        print(f"\n🖼️ Đang xử lý: {filename}")
+        print(f"\n Đang xử lý: {filename}")
         image_draw = image.copy()
         boxes, class_names = detect_blocks(img_path, conf_threshold)
 
@@ -50,7 +50,7 @@ def main():
         })
 
     export_grade_excel(grade_records, grade_output_path)
-    print("🌟 Hoàn tất!")
+    print("Hoàn tất!")
 
 if __name__ == "__main__":
     main()
