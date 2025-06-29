@@ -68,4 +68,4 @@ def process_answers(image_draw, answer_blocks, correct_answers, filename, resize
                             cv2.circle(block_cropped, (x, y), max(1, radius), (0, 0, 255), 2)
                             cv2.circle(image_draw, (abs_x, abs_y), max(1, radius), (0, 0, 255), 2)
 
-    return all_answers, correct, len(all_answers)
+    return all_answers, correct

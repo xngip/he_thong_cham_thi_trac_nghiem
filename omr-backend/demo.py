@@ -36,10 +36,14 @@ def main():
  
         if os.path.exists(answer_key_path):
             answer_key_df = pd.read_excel(answer_key_path)
-            if "Answer" in answer_key_df.columns:
-                correct_answers = answer_key_df["Answer"].tolist()
+            answer_key_df.columns = [col.strip().lower() for col in answer_key_df.columns] 
+            if "answer" in answer_key_df.columns:
+                correct_answers = answer_key_df["answer"].tolist()
+        else:
+            print("Không tồn tại file đáp án hoặc sai tên cột")
 
-        all_answers, correct, total = process_answers(image_draw, answer_blocks, correct_answers, filename)
+        total = len(correct_answers)
+        all_answers, correct = process_answers(image_draw, answer_blocks, correct_answers, filename)
         score = round(correct / total * 10, 2) if total > 0 else 0
 
         save_result_image(filename, image_draw, score, correct, total, output_dir)
@@ -47,11 +51,15 @@ def main():
         grade_records.append({
             "MA SINH VIEN": student_id,
             "MA DE": exam_id,
-            "DIEM": score
+            "DIEM": score,
+            "SO CAU DUNG": correct,
+            "TONG CAU": total    # 👈 Thêm dòng này
         })
+
 
     export_grade_excel(grade_records, grade_output_path)
     print("Hoàn tất!")
 
 if __name__ == "__main__":
     main()
+ 

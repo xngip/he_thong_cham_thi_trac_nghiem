@@ -183,11 +183,14 @@ app.post('/api/upload-answer-key', upload.single('answerKey'), (req, res) => {
       answers = data.map(row => row[firstColumnKey]).filter(answer => answer);
     }
 
-    // Nếu không có examCode, tạo một mã tự động
     if (!detectedExamCode) {
-      detectedExamCode = Date.now() % 1000;
+      const match = req.file.originalname.match(/\d+/);
+      if (match) {
+        detectedExamCode = match[0];
+      } else {
+        return res.status(400).json({ error: '⚠️ Vui lòng nhập mã đề hoặc đặt tên file có số (VD: 101.xlsx)' });
+      }
     }
-
 
     // Lưu đáp án vào file result{examCode}.xlsx
     const resultPath = path.join('result', `result${detectedExamCode}.xlsx`); 
@@ -259,6 +262,8 @@ app.post('/api/process-images', async (req, res) => {
           const studentId = gradeInfo['MA SINH VIEN'] || 'UNKNOWN';
           const examId = gradeInfo['MA DE'] || 'UNKNOWN';
           const score = gradeInfo['DIEM'] || 0;
+          const correct = gradeInfo['SO CAU DUNG'] || Math.round((gradeInfo['DIEM'] || 0) * 4);
+          const total = gradeInfo['TONG CAU'] || 40;
 
           // Tìm ảnh đã xử lý
           const processedImageName = `${path.parse(imageInfo.filename).name}_full.jpg`; // ✅ dùng backtick
@@ -268,8 +273,8 @@ app.post('/api/process-images', async (req, res) => {
             studentId,
             examId,
             score,
-            correctAnswers: Math.round(score * 4),
-            totalQuestions: 40,
+            correctAnswers: correct,
+            totalQuestions: total,
             originalImage: imageInfo.url,
             processedImage: fs.existsSync(processedImagePath)
               ? `/output/${processedImageName}` // ✅ dùng chuỗi chuẩn
@@ -321,13 +326,15 @@ app.post('/api/export-results', (req, res) => {
 
     // Tạo file Excel
     const exportData = results.map(result => ({
-      'Mã sinh viên': result.studentId,
+      'Số báo danh': result.studentId,
       'Mã đề': result.examId,
       'Số câu đúng': result.correctAnswers,
       'Tổng câu': result.totalQuestions,
       'Điểm': result.score,
       'File ảnh': result.fileName,
-      'Thời gian xử lý': result.processTime
+      'Thời gian xử lý': result.processTime,
+      'Tổng câu': result.totalQuestions,
+      'Số câu đúng': result.correctAnswers,
     }));
 
     const workbook = xlsx.utils.book_new();

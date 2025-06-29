@@ -33,6 +33,10 @@
   }
 }
 
+.a.bg-white.overflow-hidden.rounded-xl.shadow-lg {
+    margin-top: 30px;
+}
+
 .card {
   padding: 2em;
 }

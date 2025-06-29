@@ -1,10 +1,122 @@
 import React, { useState, useRef, useEffect } from 'react';
 import {
   Upload, FileText, Image, Download, CheckCircle, XCircle,
-  Calculator, FileSpreadsheet
+  Calculator, FileSpreadsheet, AlertCircle, Info, X
 } from 'lucide-react';
 
 const API_BASE = 'http://localhost:5000';
+
+// Component Toast Notification
+const Toast = ({ message, type, onClose }) => {
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      onClose();
+    }, 5000);
+    return () => clearTimeout(timer);
+  }, [onClose]);
+
+  const getToastStyles = () => {
+    switch (type) {
+      case 'success':
+        return 'bg-green-500 text-white';
+      case 'error':
+        return 'bg-red-500 text-white';
+      case 'warning':
+        return 'bg-yellow-500 text-white';
+      case 'info':
+        return 'bg-blue-500 text-white';
+      default:
+        return 'bg-gray-500 text-white';
+    }
+  };
+
+  const getIcon = () => {
+    switch (type) {
+      case 'success':
+        return <CheckCircle size={20} />;
+      case 'error':
+        return <XCircle size={20} />;
+      case 'warning':
+        return <AlertCircle size={20} />;
+      case 'info':
+        return <Info size={20} />;
+      default:
+        return <Info size={20} />;
+    }
+  };
+
+  return (
+    <div className={`${getToastStyles()} px-6 py-4 rounded-lg shadow-lg flex items-center justify-between min-w-80 max-w-md animate-slide-in`}>
+      <div className="flex items-center">
+        {getIcon()}
+        <span className="ml-3 font-medium">{message}</span>
+      </div>
+      <button onClick={onClose} className="ml-4 hover:opacity-75">
+        <X size={16} />
+      </button>
+    </div>
+  );
+};
+
+// Component hiển thị trạng thái
+const StatusCard = ({ title, status, message, type = 'info' }) => {
+  const getStatusStyles = () => {
+    switch (type) {
+      case 'success':
+        return 'border-green-200 bg-green-50';
+      case 'error':
+        return 'border-red-200 bg-red-50';
+      case 'warning':
+        return 'border-yellow-200 bg-yellow-50';
+      case 'loading':
+        return 'border-blue-200 bg-blue-50';
+      default:
+        return 'border-gray-200 bg-gray-50';
+    }
+  };
+
+  const getTextStyles = () => {
+    switch (type) {
+      case 'success':
+        return 'text-green-800';
+      case 'error':
+        return 'text-red-800';
+      case 'warning':
+        return 'text-yellow-800';
+      case 'loading':
+        return 'text-blue-800';
+      default:
+        return 'text-gray-800';
+    }
+  };
+
+  const getIcon = () => {
+    switch (type) {
+      case 'success':
+        return <CheckCircle className="text-green-500" size={20} />;
+      case 'error':
+        return <XCircle className="text-red-500" size={20} />;
+      case 'warning':
+        return <AlertCircle className="text-yellow-500" size={20} />;
+      case 'loading':
+        return <div className="w-5 h-5 border-2 border-blue-500 border-t-transparent rounded-full animate-spin" />;
+      default:
+        return <Info className="text-gray-500" size={20} />;
+    }
+  };
+
+  return (
+    <div className={`${getStatusStyles()} border rounded-lg p-4 mb-4`}>
+      <div className="flex items-center">
+        {getIcon()}
+        <div className="ml-3">
+          <h4 className={`${getTextStyles()} font-semibold`}>{title}</h4>
+          {message && <p className={`${getTextStyles()} text-sm mt-1`}>{message}</p>}
+        </div>
+      </div>
+    </div>
+  );
+};
 
 const OMRGradingSystem = () => {
   const [activeTab, setActiveTab] = useState('upload');
@@ -14,9 +126,25 @@ const OMRGradingSystem = () => {
   const [isProcessing, setIsProcessing] = useState(false);
   const [selectedExamCode, setSelectedExamCode] = useState('');
   const [modalImagePair, setModalImagePair] = useState(null);
+  
+  // States cho thông báo
+  const [toasts, setToasts] = useState([]);
+  const [uploadStatus, setUploadStatus] = useState(null);
+  const [processingStatus, setProcessingStatus] = useState(null);
 
   const imageInputRef = useRef(null);
   const excelInputRef = useRef(null);
+
+  // Hàm thêm toast
+  const addToast = (message, type = 'info') => {
+    const id = Date.now();
+    setToasts(prev => [...prev, { id, message, type }]);
+  };
+
+  // Hàm xóa toast
+  const removeToast = (id) => {
+    setToasts(prev => prev.filter(toast => toast.id !== id));
+  };
 
   useEffect(() => {
     const clearAll = async () => {
@@ -24,8 +152,10 @@ const OMRGradingSystem = () => {
         const res = await fetch(`${API_BASE}/api/clear-all`, { method: 'POST' });
         const data = await res.json();
         console.log('✅ Dọn dữ liệu:', data.message);
+        addToast('Đã khởi tạo hệ thống thành công', 'success');
       } catch (err) {
         console.error('❌ Lỗi khi gọi clear-all:', err);
+        addToast('Không thể kết nối đến server', 'error');
       }
     };
     clearAll();
@@ -33,6 +163,10 @@ const OMRGradingSystem = () => {
 
   const handleImageUpload = async (event) => {
     const files = event.target.files;
+    if (!files || files.length === 0) return;
+
+    setUploadStatus({ type: 'loading', message: `Đang tải lên ${files.length} ảnh...` });
+    
     const formData = new FormData();
     for (const file of files) {
       formData.append('images', file);
@@ -44,14 +178,28 @@ const OMRGradingSystem = () => {
         body: formData,
       });
       const data = await res.json();
+      
       if (data.success) {
         setUploadedImages(data.images);
+        setUploadStatus({ 
+          type: 'success', 
+          message: `Đã tải lên thành công ${data.images.length} ảnh bài thi` 
+        });
+        addToast(`Tải lên thành công ${data.images.length} ảnh`, 'success');
       } else {
-        alert(data.error || 'Lỗi upload ảnh');
+        setUploadStatus({ 
+          type: 'error', 
+          message: data.error || 'Lỗi không xác định khi tải ảnh' 
+        });
+        addToast(data.error || 'Lỗi upload ảnh', 'error');
       }
     } catch (err) {
       console.error(err);
-      alert('Lỗi kết nối server khi upload ảnh');
+      setUploadStatus({ 
+        type: 'error', 
+        message: 'Không thể kết nối đến server' 
+      });
+      addToast('Lỗi kết nối server khi upload ảnh', 'error');
     }
   };
 
@@ -59,52 +207,93 @@ const OMRGradingSystem = () => {
     const file = event.target.files[0];
     if (!file) return;
 
+    setUploadStatus({ type: 'loading', message: 'Đang xử lý file đáp án...' });
+
     const formData = new FormData();
     formData.append('answerKey', file);
-    formData.append('examCode', selectedExamCode);
+
+    if (selectedExamCode.trim()) {
+      formData.append('examCode', selectedExamCode.trim());
+    }
 
     try {
       const res = await fetch(`${API_BASE}/api/upload-answer-key`, {
         method: 'POST',
         body: formData,
       });
+
       const data = await res.json();
       if (data.success) {
         setAnswerKeys(prev => ({
           ...prev,
-          [data.examCode]: data.answers
+          [data.examCode]: {
+            answers: data.answers,
+            totalQuestions: data.totalQuestions
+          }
         }));
-        alert(`Đã upload đáp án cho mã đề ${data.examCode}`);
+        setSelectedExamCode('');
+        setUploadStatus({ 
+          type: 'success', 
+          message: `Đã upload đáp án cho mã đề ${data.examCode} (${data.totalQuestions} câu)` 
+        });
+        addToast(`Đã upload đáp án mã đề ${data.examCode}`, 'success');
       } else {
-        alert(data.error || 'Lỗi upload đáp án');
+        setUploadStatus({ 
+          type: 'error', 
+          message: data.error || 'Lỗi không xác định khi upload đáp án' 
+        });
+        addToast(data.error || 'Lỗi upload đáp án', 'error');
       }
     } catch (err) {
       console.error(err);
-      alert('Lỗi kết nối server khi upload đáp án');
+      setUploadStatus({ 
+        type: 'error', 
+        message: 'Không thể kết nối đến server' 
+      });
+      addToast('Lỗi kết nối server khi upload đáp án', 'error');
     }
   };
 
   const processAllImages = async () => {
     if (uploadedImages.length === 0) {
-      alert('Vui lòng tải lên ít nhất một ảnh bài thi');
+      addToast('Vui lòng tải lên ít nhất một ảnh bài thi', 'warning');
       return;
     }
 
     setIsProcessing(true);
+    setProcessingStatus({ 
+      type: 'loading', 
+      message: `Đang xử lý ${uploadedImages.length} ảnh bài thi...` 
+    });
+
     try {
       const res = await fetch(`${API_BASE}/api/process-images`, {
         method: 'POST',
       });
       const data = await res.json();
+      
       if (data.success) {
         setGradingResults(data.results);
+        setProcessingStatus({ 
+          type: 'success', 
+          message: `Đã chấm xong ${data.results.length} bài thi` 
+        });
+        addToast(`Chấm điểm thành công ${data.results.length} bài thi`, 'success');
         setActiveTab('results');
       } else {
-        alert(data.error || 'Lỗi xử lý ảnh');
+        setProcessingStatus({ 
+          type: 'error', 
+          message: data.error || 'Lỗi không xác định khi xử lý ảnh' 
+        });
+        addToast(data.error || 'Lỗi xử lý ảnh', 'error');
       }
     } catch (err) {
       console.error(err);
-      alert('Không thể kết nối tới máy chủ để xử lý ảnh');
+      setProcessingStatus({ 
+        type: 'error', 
+        message: 'Không thể kết nối tới máy chủ để xử lý ảnh' 
+      });
+      addToast('Không thể kết nối tới máy chủ', 'error');
     } finally {
       setIsProcessing(false);
     }
@@ -112,9 +301,11 @@ const OMRGradingSystem = () => {
 
   const exportResults = async () => {
     if (gradingResults.length === 0) {
-      alert('Chưa có kết quả để xuất');
+      addToast('Chưa có kết quả để xuất', 'warning');
       return;
     }
+
+    addToast('Đang chuẩn bị file Excel...', 'info');
 
     try {
       const res = await fetch(`${API_BASE}/api/export-results`, {
@@ -129,23 +320,41 @@ const OMRGradingSystem = () => {
         link.href = window.URL.createObjectURL(blob);
         link.download = 'ket_qua_cham_thi.xlsx';
         link.click();
+        addToast('Đã xuất file Excel thành công', 'success');
       } else {
         const data = await res.json();
-        alert(data.error || 'Lỗi xuất file');
+        addToast(data.error || 'Lỗi xuất file', 'error');
       }
     } catch (err) {
       console.error(err);
-      alert('Lỗi kết nối server khi xuất file');
+      addToast('Lỗi kết nối server khi xuất file', 'error');
     }
+  };
+
+  const removeImage = (imageId) => {
+    setUploadedImages(prev => prev.filter(img => img.id !== imageId));
+    addToast('Đã xóa ảnh', 'info');
   };
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100">
+      {/* Toast Container */}
+      <div className="fixed top-4 right-4 z-50 space-y-2">
+        {toasts.map(toast => (
+          <Toast
+            key={toast.id}
+            message={toast.message}
+            type={toast.type}
+            onClose={() => removeToast(toast.id)}
+          />
+        ))}
+      </div>
+
       <div className="container mx-auto px-4 py-8">
         {/* Header */}
         <div className="text-center mb-8">
           <h1 className="text-4xl font-bold text-gray-800 mb-4">
-            Hệ thống chấm điểm trắc nghiệm THPT Quốc gia
+            Hệ Thống Chấm Điểm Bài Thi Trắc Nghiệm THPT Quốc Gia
           </h1>
           <p className="text-gray-600 text-lg">
             Mẫu phiếu trả lời năm 2018 - Tự động nhận diện và chấm điểm
@@ -194,6 +403,16 @@ const OMRGradingSystem = () => {
         {/* Upload Tab */}
         {activeTab === 'upload' && (
           <div className="max-w-4xl mx-auto">
+            {/* Status Display */}
+            {uploadStatus && (
+              <StatusCard
+                title={uploadStatus.type === 'loading' ? 'Đang xử lý...' : 
+                       uploadStatus.type === 'success' ? 'Thành công!' : 'Lỗi!'}
+                message={uploadStatus.message}
+                type={uploadStatus.type}
+              />
+            )}
+
             <div className="grid md:grid-cols-2 gap-8">
               {/* Image Upload */}
               <div className="bg-white rounded-xl shadow-lg p-6">
@@ -289,7 +508,9 @@ const OMRGradingSystem = () => {
                       {Object.keys(answerKeys).map((examCode) => (
                         <div key={examCode} className="bg-green-50 p-3 rounded-lg">
                           <span className="font-medium text-green-800">Mã đề {examCode}</span>
-                          <span className="text-green-600 ml-2">({answerKeys[examCode].length} câu)</span>
+                          <span className="text-green-600 ml-2">
+                            ({answerKeys[examCode].totalQuestions} câu)
+                          </span>
                         </div>
                       ))}
                     </div>
@@ -303,6 +524,16 @@ const OMRGradingSystem = () => {
         {/* Process Tab */}
         {activeTab === 'process' && (
           <div className="max-w-2xl mx-auto">
+            {/* Processing Status */}
+            {processingStatus && (
+              <StatusCard
+                title={processingStatus.type === 'loading' ? 'Đang xử lý...' : 
+                       processingStatus.type === 'success' ? 'Hoàn thành!' : 'Lỗi!'}
+                message={processingStatus.message}
+                type={processingStatus.type}
+              />
+            )}
+
             <div className="bg-white rounded-xl shadow-lg p-8 text-center">
               <Calculator className="mx-auto text-blue-500 mb-6" size={64} />
               <h2 className="text-2xl font-bold text-gray-800 mb-4">Xử lý và chấm điểm</h2>
@@ -333,12 +564,53 @@ const OMRGradingSystem = () => {
         {/* Results Tab */}
         {activeTab === 'results' && (
           <div className="max-w-7xl mx-auto">
+            <div className="flex justify-between items-center mb-8">
+              <h2 className="text-2xl font-bold text-gray-800">Tổng Quan Kết Quả</h2>
+              <button
+                onClick={exportResults}
+                className="bg-green-500 hover:bg-green-600 text-white font-bold h-14 px-6 rounded-lg flex items-center text-base"
+              >
+                <Download className="mr-2" size={20} />
+                Xuất Excel
+              </button>
+            </div>
+
+            {/* Results Summary */}
+            {gradingResults.length > 0 && (
+              <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">
+                <div className="bg-white p-4 rounded-lg shadow">
+                  <h3 className="text-lg font-semibold text-gray-700">Tổng số bài</h3>
+                  <p className="text-2xl font-bold text-blue-600">{gradingResults.length}</p>
+                </div>
+                <div className="bg-white p-4 rounded-lg shadow">
+                  <h3 className="text-lg font-semibold text-gray-700">Đạt (≥5đ)</h3>
+                  <p className="text-2xl font-bold text-green-600">
+                    {gradingResults.filter(r => r.score >= 5).length}
+                  </p>
+                </div>
+                <div className="bg-white p-4 rounded-lg shadow">
+                  <h3 className="text-lg font-semibold text-gray-700">Không đạt</h3>
+                  <p className="text-2xl font-bold text-red-600">
+                    {gradingResults.filter(r => r.score < 5).length}
+                  </p>
+                </div>
+                <div className="bg-white p-4 rounded-lg shadow">
+                  <h3 className="text-lg font-semibold text-gray-700">Điểm TB</h3>
+                  <p className="text-2xl font-bold text-purple-600">
+                    {gradingResults.length > 0 ? 
+                      (gradingResults.reduce((sum, r) => sum + r.score, 0) / gradingResults.length).toFixed(2) 
+                      : '0'}
+                  </p>
+                </div>
+              </div>
+            )}
+
             <div className="bg-white rounded-xl shadow-lg overflow-hidden">
               <div className="overflow-x-auto">
                 <table className="w-full">
                   <thead className="bg-gray-50">
                     <tr>
-                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Mã SV</th>
+                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Số Báo Danh</th>
                       <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Mã đề</th>
                       <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Kết quả</th>
                       <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Điểm</th>
