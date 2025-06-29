@@ -32,7 +32,8 @@ def main():
         cv2.putText(image_draw, f"MA DE: {exam_id}", (50, 110), cv2.FONT_HERSHEY_SIMPLEX, 1.2, (0, 0, 255), 3)
 
         correct_answers = []
-        answer_key_path = os.path.join(answer_key_dir, f"{exam_id}.xlsx")
+        answer_key_path = os.path.join(answer_key_dir, f"result{exam_id}.xlsx")
+ 
         if os.path.exists(answer_key_path):
             answer_key_df = pd.read_excel(answer_key_path)
             if "Answer" in answer_key_df.columns:
