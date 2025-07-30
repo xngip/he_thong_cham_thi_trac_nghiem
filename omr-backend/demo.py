@@ -53,7 +53,7 @@ def main():
             "MA DE": exam_id,
             "DIEM": score,
             "SO CAU DUNG": correct,
-            "TONG CAU": total
+            "TONG CAU": total    # 👈 Thêm dòng này
         })
 
 
